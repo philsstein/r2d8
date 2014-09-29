@@ -7,6 +7,7 @@ import re
 import yaml
 import requests
 from os import path
+from sys import exit
 from time import sleep
 from AccountDetails import UID, PASS
 from boardgamegeek import BoardGameGeek as BGG
@@ -32,50 +33,75 @@ def set_log_level(arg):
 
 
 header = '''
-*^({} issues a series of sophisticated beeps and whistles...)*
+*^({} issues a series of sophisticated bleeps and whistles...)*
 
 '''.format(bot_name)
 
 footer = '''
 
 -------------
-^({} is a bot. A helpful bot. Looks a little like a trash can, but you shouldn't hold that against him.)
+^({} is a bot. Looks a little like a trash can, but you shouldn't hold that against him.)
+[^Submit ^questions, ^abuse, ^and ^bug ^reports ^here.](/r/r2d8)
 '''.format(bot_name)
 
-def handle_link(comment):
+def handle_getinfo(comment):
     bgg = BGG()
     infos = []
     gids = []
+    game_iter = re.finditer('\*\*([^\*]+)\*\*', comment.body)
+    game_count = sum(1 for _ in game_iter)
+    min_mode = True if game_count >= 10 else False
+    if min_mode:
+        log.debug('in min mode {} games referenced'.format(game_count))
+        infos.append('BGG Links for referenced games:\n\n')
+    else:
+        log.debug('in normal mode {} games referenced'.format(game_count))
+
     for m in re.finditer('\*\*([^\*]+)\*\*', comment.body):
-        log.debug('looking for game {}'.format(m.group(1)))
+        log.info('asking BGG for info on {}'.format(m.group(1)))
         try:
-            game = bgg.game(m.group(1))
+            titles = [title for title in bgg.search(m.group(1)) if title.type=='boardgame' and title.name == m.group(1)]
+            log.debug('titles: {}'.format(titles))
+            games = [bgg.game(name=None, game_id=t.id) for t in titles]
+            games.sort(key=lambda g: g.year)
+            games.reverse()
         except boardgamegeek.exceptions.BoardGameGeekError:
             log.error('Error getting info from BGG on {}'.format(m.group(1)))
             continue
 
-        if game and game.id not in gids:
-            info = 'Details about [**{}**](http://boardgamegeek.com/boardgame/{}):'.format(
-                game.name, game.id)
-            info += '\n\n'
-            info += ' * Released in {}\n'.format(game.year)
-            data = ', '.join(getattr(game, 'designers', 'Unknown'))
-            info += ' * Designed by {}\n'.format(data)
-            data = ', '.join(getattr(game, 'mechanics', 'not listed'))
-            info += ' * Mechanics: {}\n'.format(data)
-            info += ' * Average rating is {}; rated by {} people\n'.format(
-                game.rating_average, game.users_rated)
-            for rank in game.ranks:
-                info += ' * {}: {}\n'.format(rank['friendlyname'], rank['value'])
-            info += ('\nMore information can be found on [{}\'s page on BGG]'
-                     '(http://boardgamegeek.com/boardgame/{})'.format(game.name, game.id))
-            info += '\n\n'
-            log.debug('adding info: {}'.format(info))
-            infos.append(info)
-            gids.append(game.id)
+        for game in games:                            
+            if game.id not in gids:
+                log.debug('found game {} ({})'.format(game.name.encode('utf-8'), game.year))
+                if min_mode:
+                    info = ' * [{}](http://boardgamegeek.com/boardgame/{})'.format(
+                        game.name.encode('utf-8'), game.id)
+                else:
+                    info = 'Details about [**{}**](http://boardgamegeek.com/boardgame/{}):'.format(
+                        game.name.encode('utf-8'), game.id)
+                    info += '\n\n'
+                    info += ' * Released in {}\n'.format(game.year)
+                    data = ', '.join(getattr(game, 'designers', 'Unknown'))
+                    info += ' * Designed by {}\n'.format(data.encode('utf-8'))
+                    data = ', '.join(getattr(game, 'mechanics', 'not listed'))
+                    info += ' * Mechanics: {}\n'.format(data.encode('utf-8'))
+                    info += ' * Average rating is {}; rated by {} people\n'.format(
+                        game.rating_average, game.users_rated)
+                    for rank in game.ranks:
+                        info += ' * {}: {}\n'.format(rank['friendlyname'], rank['value'])
+                    info += ('\nMore information can be found on the [{} page on BGG]'
+                             '(http://boardgamegeek.com/boardgame/{})'.format(game.name.encode('utf-8'), game.id))
+                    info += '\n\n'
+
+                log.debug('adding info: {}'.format(info))
+                infos.append(info)
+                gids.append(game.id)
 
     if len(infos):
-        comment.reply(header + '-----\n'.join([i for i in infos]) + footer)
+        if not min_mode:
+            comment.reply(header + '-----\n'.join([i for i in infos]) + footer)
+        else:
+            comment.reply(header + '\n'.join([i for i in infos]) + footer)
+
         log.info('Replied to info request for comment {}'.format(comment.id))
 
 
@@ -93,7 +119,7 @@ if __name__ == "__main__":
     p.add_argument('-s', '--subreddit', help='Subreddit to listen to. Can be specified'
                    ' multiple times. Default is "boardgames"', default='boardgames')
     p.add_argument('-c', '--config', help='Path to configuration/history file.', 
-                   default=path.join('.', 'r2d10.config'))
+                   default=path.join('.', '{}.config'.format(bot_name)))
     p.add_argument("-l", "--loglevel", dest="loglevel",
                     help="The level at which to log. Must be one of "
                     "none, debug, info, warning, error, or critical. Default is none. ("
@@ -108,7 +134,7 @@ if __name__ == "__main__":
     password = args.password if args.password else PASS
 
     commands = {
-        'link': handle_link,
+        'getinfo': handle_getinfo,
         'help': handle_help,
         'xyzzy': handle_xyzzy,
     }
@@ -126,7 +152,7 @@ if __name__ == "__main__":
     attn = '!{}'.format(bot_name)
     while True:
         try:
-            for comment in subreddit.get_comments():
+            for comment in subreddit.get_comments(limit=None):
                 cid = comment.id.encode('utf-8')
                 log.debug('read comment {}'.format(cid))
                 if cid not in conf['scanned_comments']:
