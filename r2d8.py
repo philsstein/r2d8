@@ -97,8 +97,9 @@ def handle_getinfo(comment, bgg):
             info = ('Details about [**{}**](http://boardgamegeek.com/boardgame/{}) '
                     ' ({}) by {}\n\n'.format(game.name.encode('utf-8'), game.id, game.year,
                                           ', '.join(getattr(game, 'designers', 'Unknown')).encode('utf-8')))
-            data = ', '.join(getattr(game, 'mechanics', 'not listed'))
-            info += ' * Mechanics: {}\n'.format(data.encode('utf-8'))
+            data = ', '.join(getattr(game, 'mechanics', ''))
+            if data:
+                info += ' * Mechanics: {}\n'.format(data.encode('utf-8'))
             people = 'people' if game.users_rated > 1 else 'person'
             info += ' * Average rating is {}; rated by {} {}\n'.format(
                 game.rating_average, game.users_rated, people)
