@@ -15,6 +15,7 @@ import boardgamegeek
 
 bot_name = 'r2d8'
 log = logging.getLogger(bot_name)
+logging.getLogger("requests").setLevel(logging.WARNING)
 
 def set_log_level(arg):
     logLevels = {
@@ -44,49 +45,71 @@ footer = '''
 [^Submit ^questions, ^abuse, ^and ^bug ^reports ^here.](/r/r2d8)
 '''.format(bot_name)
 
-def handle_getinfo(commenti, bgg):
-    infos = []
-    game_iter = re.finditer('\*\*([^\*]+)\*\*', comment.body)
-    game_count = sum(1 for _ in game_iter)
-    min_mode = True if game_count >= 10 else False
-    if min_mode:
-        log.debug('in min mode {} games referenced'.format(game_count))
-        infos.append('BGG Links for referenced games:\n\n')
-    else:
-        log.debug('in normal mode {} games referenced'.format(game_count))
+common_abbrv = {
+    'Dead of Winter': 'Dead of Winter: A Crossroads Game',
+    'Pathfinder': 'Pathfinder Adventure Card Game: Rise of the Runelords - Base Set'
+}
 
-    for m in re.finditer('\*\*([^\*]+)\*\*', comment.body):
-        log.info('asking BGG for info on {}'.format(m.group(1).encode('utf-8')))
+def handle_getinfo(comment, bgg):
+    bolded = [m.group(1).encode('utf-8') for m in re.finditer('\*\*([^\*]+)\*\*', comment.body)]
+    games = []
+    not_found = []
+    min_mode = False
+
+    for game_name in bolded:
+        if game_name in common_abbrv.keys():
+            game_name = common_abbrv[game_name]
+
+        log.info('asking BGG for info on {}'.format(game_name))
         try:
-            titles = [t for t in bgg.search(m.group(1)) if t.type=='boardgame' and t.name == m.group(1)]
-            log.debug('titles: {}'.format(titles))
-            games = [bgg.game(name=None, game_id=t.id) for t in titles]
-            games.sort(key=lambda g: g.year)
-            games.reverse()
+            games_of_this_name = []
+            for title in bgg.search(game_name):
+                if title.type == 'boardgame':
+                    if title.name == game_name:
+                        # search returns a game even if the alternate game name is the name.
+                        tmp_game = bgg.game(name=None, game_id=title.id)
+                        if tmp_game.name.encode('utf-8') == game_name:
+                            games_of_this_name.append(bgg.game(name=None, game_id=title.id))
+
+            games_of_this_name.sort(key=lambda g: g.year, reverse=True)
+            games += games_of_this_name
+
         except boardgamegeek.exceptions.BoardGameGeekError:
-            log.error('Error getting info from BGG on {}'.format(m.group(1)))
+            log.error('Error getting info from BGG on {}'.format(game_name))
             continue
 
-        for game in games:                            
-            log.debug('found game {} ({})'.format(game.name.encode('utf-8'), game.year))
-            if min_mode:
-                info = (' * [**{}**](http://boardgamegeek.com/boardgame/{}) '
-                        ' ({}) by {}'.format(game.name.encode('utf-8'), game.id, game.year,
-                                              ', '.join(getattr(game, 'designers', 'Unknown')).encode('utf-8')))
-            else:
-                info = ('Details about [**{}**](http://boardgamegeek.com/boardgame/{}) '
-                        ' ({}) by {}\n\n'.format(game.name.encode('utf-8'), game.id, game.year,
-                                              ', '.join(getattr(game, 'designers', 'Unknown')).encode('utf-8')))
-                data = ', '.join(getattr(game, 'mechanics', 'not listed'))
-                info += ' * Mechanics: {}\n'.format(data.encode('utf-8'))
-                people = 'people' if game.users_rated > 1 else 'person'
-                info += ' * Average rating is {}; rated by {} {}\n'.format(
-                    game.rating_average, game.users_rated, people)
-                data = ', '.join(['{}: {}'.format(r['friendlyname'], r['value']) for r in game.ranks])
-                info += ' * {}\n\n'.format(data)
+    # we now have all the games. 
+    min_mode = True if len(games) > 6 else False
+    not_found = list(set(bolded) - set([game.name for game in games]))
+    not_found = [g for g in not_found if g not in common_abbrv.keys()]
 
-            log.debug('adding info: {}'.format(info))
-            infos.append(info)
+    if not_found:
+        log.debug('not found: {}'.format(', '.join(not_found)))
+
+    infos = []
+    for game in games:                            
+        log.debug('found game {} ({})'.format(game.name.encode('utf-8'), game.year))
+        if min_mode:
+            info = (' * [**{}**](http://boardgamegeek.com/boardgame/{}) '
+                    ' ({}) by {}'.format(game.name.encode('utf-8'), game.id, game.year,
+                                          ', '.join(getattr(game, 'designers', 'Unknown')).encode('utf-8')))
+        else:
+            info = ('Details about [**{}**](http://boardgamegeek.com/boardgame/{}) '
+                    ' ({}) by {}\n\n'.format(game.name.encode('utf-8'), game.id, game.year,
+                                          ', '.join(getattr(game, 'designers', 'Unknown')).encode('utf-8')))
+            data = ', '.join(getattr(game, 'mechanics', 'not listed'))
+            info += ' * Mechanics: {}\n'.format(data.encode('utf-8'))
+            people = 'people' if game.users_rated > 1 else 'person'
+            info += ' * Average rating is {}; rated by {} {}\n'.format(
+                game.rating_average, game.users_rated, people)
+            data = ', '.join(['{}: {}'.format(r['friendlyname'], r['value']) for r in game.ranks])
+            info += ' * {}\n\n'.format(data)
+
+        log.debug('adding info: {}'.format(info))
+        infos.append(info)
+
+    if not_found:
+        infos.append('Bolded items not found at BGG: {}\n\n'.format(', '.join(not_found)))
 
     if len(infos):
         if not min_mode:
@@ -143,27 +166,26 @@ if __name__ == "__main__":
         bgg = BGG()
 
     attn = '!{} getinfo'.format(bot_name)
-    comment_count = 0
     while True:
         try:
             # for comment in subreddit.get_comments(limit=None):
             for comment in praw.helpers.comment_stream(reddit, args.subreddit, limit=None):
                 cid = comment.id.encode('utf-8')
-                comment_count += 1
                 log.debug('read comment {}'.format(cid))
                 if cid not in conf['scanned_comments']:
-                    log.info('scanning comment {}'.format(cid))
+                    log.info('scanning comment {}{}'.format(comment.link_url.encode('utf-8'), cid))
                     conf['scanned_comments'].append(cid)
                     if attn in comment.body.lower():
-                        log.debug('executing getinfo')
-                        handle_getinfo(comment, bgg)
+                        if '[deleted]' == comment.link_author.encode('utf-8'):
+                            log.debug('skipping deleted comment')
+                        else:
+                            log.debug('executing getinfo')
+                            handle_getinfo(comment, bgg)
 
                 # this may be a bad idea, but when else to save state?
-                if comment_count > 10:
-                    comment_count = 0
-                    with open(args.config, 'w') as fd:
-                        log.info('writing config file')
-                        fd.write(yaml.dump(conf, default_flow_style=True))
+                with open(args.config, 'w') as fd:
+                    log.debug('writing config file')
+                    fd.write(yaml.dump(conf, default_flow_style=True))
 
         except (praw.errors.APIException,
                 praw.errors.ClientException,
