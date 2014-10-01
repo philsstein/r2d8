@@ -44,10 +44,8 @@ footer = '''
 [^Submit ^questions, ^abuse, ^and ^bug ^reports ^here.](/r/r2d8)
 '''.format(bot_name)
 
-def handle_getinfo(comment):
-    bgg = BGG()
+def handle_getinfo(commenti, bgg):
     infos = []
-    gids = []
     game_iter = re.finditer('\*\*([^\*]+)\*\*', comment.body)
     game_count = sum(1 for _ in game_iter)
     min_mode = True if game_count >= 10 else False
@@ -58,9 +56,9 @@ def handle_getinfo(comment):
         log.debug('in normal mode {} games referenced'.format(game_count))
 
     for m in re.finditer('\*\*([^\*]+)\*\*', comment.body):
-        log.info('asking BGG for info on {}'.format(m.group(1)))
+        log.info('asking BGG for info on {}'.format(m.group(1).encode('utf-8')))
         try:
-            titles = [title for title in bgg.search(m.group(1)) if title.type=='boardgame' and title.name == m.group(1)]
+            titles = [t for t in bgg.search(m.group(1)) if t.type=='boardgame' and t.name == m.group(1)]
             log.debug('titles: {}'.format(titles))
             games = [bgg.game(name=None, game_id=t.id) for t in titles]
             games.sort(key=lambda g: g.year)
@@ -70,31 +68,25 @@ def handle_getinfo(comment):
             continue
 
         for game in games:                            
-            if game.id not in gids:
-                log.debug('found game {} ({})'.format(game.name.encode('utf-8'), game.year))
-                if min_mode:
-                    info = ' * [{}](http://boardgamegeek.com/boardgame/{})'.format(
-                        game.name.encode('utf-8'), game.id)
-                else:
-                    info = 'Details about [**{}**](http://boardgamegeek.com/boardgame/{}):'.format(
-                        game.name.encode('utf-8'), game.id)
-                    info += '\n\n'
-                    info += ' * Released in {}\n'.format(game.year)
-                    data = ', '.join(getattr(game, 'designers', 'Unknown'))
-                    info += ' * Designed by {}\n'.format(data.encode('utf-8'))
-                    data = ', '.join(getattr(game, 'mechanics', 'not listed'))
-                    info += ' * Mechanics: {}\n'.format(data.encode('utf-8'))
-                    info += ' * Average rating is {}; rated by {} people\n'.format(
-                        game.rating_average, game.users_rated)
-                    for rank in game.ranks:
-                        info += ' * {}: {}\n'.format(rank['friendlyname'], rank['value'])
-                    info += ('\nMore information can be found on the [{} page on BGG]'
-                             '(http://boardgamegeek.com/boardgame/{})'.format(game.name.encode('utf-8'), game.id))
-                    info += '\n\n'
+            log.debug('found game {} ({})'.format(game.name.encode('utf-8'), game.year))
+            if min_mode:
+                info = (' * [**{}**](http://boardgamegeek.com/boardgame/{}) '
+                        ' ({}) by {}'.format(game.name.encode('utf-8'), game.id, game.year,
+                                              ', '.join(getattr(game, 'designers', 'Unknown')).encode('utf-8')))
+            else:
+                info = ('Details about [**{}**](http://boardgamegeek.com/boardgame/{}) '
+                        ' ({}) by {}\n\n'.format(game.name.encode('utf-8'), game.id, game.year,
+                                              ', '.join(getattr(game, 'designers', 'Unknown')).encode('utf-8')))
+                data = ', '.join(getattr(game, 'mechanics', 'not listed'))
+                info += ' * Mechanics: {}\n'.format(data.encode('utf-8'))
+                people = 'people' if game.users_rated > 1 else 'person'
+                info += ' * Average rating is {}; rated by {} {}\n'.format(
+                    game.rating_average, game.users_rated, people)
+                data = ', '.join(['{}: {}'.format(r['friendlyname'], r['value']) for r in game.ranks])
+                info += ' * {}\n\n'.format(data)
 
-                log.debug('adding info: {}'.format(info))
-                infos.append(info)
-                gids.append(game.id)
+            log.debug('adding info: {}'.format(info))
+            infos.append(info)
 
     if len(infos):
         if not min_mode:
@@ -120,6 +112,7 @@ if __name__ == "__main__":
                    ' multiple times. Default is "boardgames"', default='boardgames')
     p.add_argument('-c', '--config', help='Path to configuration/history file.', 
                    default=path.join('.', '{}.config'.format(bot_name)))
+    p.add_argument('-C', '--cache', help='path tp SQL file used for cache.')
     p.add_argument("-l", "--loglevel", dest="loglevel",
                     help="The level at which to log. Must be one of "
                     "none, debug, info, warning, error, or critical. Default is none. ("
@@ -133,46 +126,46 @@ if __name__ == "__main__":
     user = args.user if args.user else UID
     password = args.password if args.password else PASS
 
-    commands = {
-        'getinfo': handle_getinfo,
-        'help': handle_help,
-        'xyzzy': handle_xyzzy,
-    }
-
     reddit = praw.Reddit('{} - boardgame util bot, v 0.1'.format(bot_name))
     reddit.login(username=user, password=password)
     subreddit = reddit.get_subreddit(args.subreddit)
 
     if path.exists(args.config):
         conf = yaml.safe_load(file(args.config, 'r'))
+        log.info('read in config {}'.format(args.config))
     else:
         conf = {}
         conf['scanned_comments'] = []
 
-    attn = '!{}'.format(bot_name)
+    if args.cache:
+        bgg = BGG(cache='sqlite://{}?ttl=86400'.format(args.cache))
+    else:
+        bgg = BGG()
+
+    attn = '!{} getinfo'.format(bot_name)
+    comment_count = 0
     while True:
         try:
-            for comment in subreddit.get_comments(limit=None):
+            # for comment in subreddit.get_comments(limit=None):
+            for comment in praw.helpers.comment_stream(reddit, args.subreddit, limit=None):
                 cid = comment.id.encode('utf-8')
+                comment_count += 1
                 log.debug('read comment {}'.format(cid))
                 if cid not in conf['scanned_comments']:
                     log.info('scanning comment {}'.format(cid))
                     conf['scanned_comments'].append(cid)
                     if attn in comment.body.lower():
-                        cmd = comment.body[comment.body.find(attn):].split()[1]
-                        log.info('found command {}'.format(cmd))
-                        if cmd in commands.keys():
-                            log.debug('executing cmd {}'.format(cmd))
-                            commands[cmd](comment)
+                        log.debug('executing getinfo')
+                        handle_getinfo(comment, bgg)
+
+                # this may be a bad idea, but when else to save state?
+                if comment_count > 10:
+                    comment_count = 0
+                    with open(args.config, 'w') as fd:
+                        log.info('writing config file')
+                        fd.write(yaml.dump(conf, default_flow_style=True))
 
         except (praw.errors.APIException,
                 praw.errors.ClientException,
                 requests.HTTPError) as e:
             log.error('Caught exception: {}'.format(e))
-
-        # this may be a bad idea, but when else to save state?
-        with open(args.config, 'w') as fd:
-            fd.write(yaml.dump(conf, default_flow_style=True))
-
-        sleep(60)
-
