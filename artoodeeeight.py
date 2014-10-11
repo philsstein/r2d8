@@ -42,12 +42,15 @@ if __name__ == '__main__':
             for comment in rb.get_comments_to_scan(subreddits=subreddits, mentions=True):
                 if not bdb.comment_exists(comment):
                     bdb.add_comment(comment)
-                    if '[deleted]' != comment.link_author.encode('utf-8'):
-                        for cmd in botcmds.findall(comment.body):
-                            if cmd in cmdmap:
-                                cmdmap[cmd](comment)
-                            else:
-                                log.info('Got unknown command: {}'.format(cmd))
+                    # there is probably a better way to find [deleted] comment.
+                    if getattr(comment, 'link_author', None):    
+                        if '[deleted]' == comment.link_author.encode('utf-8'):
+                            continue
+                    for cmd in botcmds.findall(comment.body):
+                        if cmd in cmdmap:
+                            cmdmap[cmd](comment)
+                        else:
+                            log.info('Got unknown command: {}'.format(cmd))
 
         except Exception as e:
             log.error('Caught exception: {}'.format(e))

@@ -17,7 +17,7 @@ class CommentHandler(object):
         self._botdb = botdb
         self._botname = reddit.UID()
         self._header = '*^({} issues a series of sophisticated bleeps and whistles...)*\n\n'.format(self._botname)
-        self._footer = ('\n'
+        self._footer = ('\n\n'
                         '-------------\n'
                         '^({} is a bot. Looks a little like a trash can, but you shouldn\'t hold that against him.)'
                         '[^Submit ^questions, ^abuse, ^and ^bug ^reports ^here.](/r/r2d8)'.format(self._botname))
@@ -41,6 +41,10 @@ class CommentHandler(object):
 
         games = []
         not_found = []
+
+        if comment.subreddit.display_name.lower() == 'boardgamescirclejerk':
+            old_bolded = bolded[:]
+            bolded = ['Dead of Winter: A Crossroads Game']
 
         for game_name in bolded:
             if game_name in self._gameNameMap.keys():
@@ -70,7 +74,10 @@ class CommentHandler(object):
         mode = 'short' if len(games) > 6 else None
         not_found = list(set(bolded) - set([game.name for game in games]))
         not_found = [g for g in not_found if g not in self._gameNameMap.keys()]
-    
+
+        if comment.subreddit.display_name.lower() == 'boardgamescirclejerk':
+            not_found = old_bolded[:]
+
         if not_found:
             log.debug('not found: {}'.format(', '.join(not_found)))
 

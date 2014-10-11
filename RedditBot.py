@@ -48,10 +48,15 @@ class RedditBot(object):
 
             def run(self):
                 while True:
-                    for item in self._source(*self._source_args):
-                        self._queue.put(item)
-                        if self._stop.isSet():
-                            return
+                    try:
+                        for item in self._source(*self._source_args):
+                            self._queue.put(item)
+                            if self._stop.isSet():
+                                return
+                    except Exception as e:
+                        log.error('Got exception in consume thread: {}'.format(e))
+                        sleep(5)
+
                     if self._sleep:
                         sleep(self._sleep)
     
