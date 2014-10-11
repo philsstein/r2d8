@@ -15,3 +15,8 @@ where UID is the UID of the bot, usually "r2d8".
 
 Currently the bot acknowledges ^C, but does not exit. One consume thread is not dying for some reason.
 
+Requirements:
+ - PRAW
+ - boardgamegeek
+ - sqlite3 (included in most distributions, I think.)
+
