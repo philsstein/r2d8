@@ -12,6 +12,7 @@ from time import sleep
 from AccountDetails import UID, PASS
 from boardgamegeek import BoardGameGeek as BGG
 import boardgamegeek
+from CommentDatabase import CommentDatabase
 
 bot_name = 'r2d8'
 log = logging.getLogger(bot_name)
@@ -110,6 +111,8 @@ def handle_getinfo(comment, bgg):
         infos.append(info)
 
     if not_found:
+        not_found = ['[{}](http://boardgamegeek.com/geeksearch.php?action=search&objecttype=boardgame&q={}&B1=Go)'.format(
+            n, n) for n in not_found]
         infos.append('Bolded items not found at BGG: {}\n\n'.format(', '.join(not_found)))
 
     if len(infos):
@@ -129,13 +132,11 @@ def handle_help(comment):
     pass
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(prog='r2d6')
+    p = argparse.ArgumentParser(prog=bot_name)
     p.add_argument("-u", "--user", help='Reddit account to run the bot as.')
     p.add_argument("-p", "--password", help='password for reddit account')
     p.add_argument('-s', '--subreddit', help='Subreddit to listen to. Can be specified'
                    ' multiple times. Default is "boardgames"', default='boardgames')
-    p.add_argument('-c', '--config', help='Path to configuration/history file.', 
-                   default=path.join('.', '{}.config'.format(bot_name)))
     p.add_argument('-C', '--cache', help='path tp SQL file used for cache.')
     p.add_argument("-l", "--loglevel", dest="loglevel",
                     help="The level at which to log. Must be one of "
@@ -154,12 +155,7 @@ if __name__ == "__main__":
     reddit.login(username=user, password=password)
     subreddit = reddit.get_subreddit(args.subreddit)
 
-    if path.exists(args.config):
-        conf = yaml.safe_load(file(args.config, 'r'))
-        log.info('read in config {}'.format(args.config))
-    else:
-        conf = {}
-        conf['scanned_comments'] = []
+    cdb = CommentDatabase(path.join('.', '{}-comments.db'.format(bot_name)))
 
     if args.cache:
         bgg = BGG(cache='sqlite://{}?ttl=86400'.format(args.cache))
@@ -171,11 +167,9 @@ if __name__ == "__main__":
         try:
             # for comment in subreddit.get_comments(limit=None):
             for comment in praw.helpers.comment_stream(reddit, args.subreddit, limit=None):
-                cid = comment.id.encode('utf-8')
-                log.debug('read comment {}'.format(cid))
-                if cid not in conf['scanned_comments']:
-                    log.info('scanning comment {}{}'.format(comment.link_url.encode('utf-8'), cid))
-                    conf['scanned_comments'].append(cid)
+                log.debug('read comment {}'.format(comment.id.encode('utf-8')))
+                if not cdb.comment_exists(comment):
+                    cdb.add_comment(comment)
                     if attn in comment.body.lower():
                         if '[deleted]' == comment.link_author.encode('utf-8'):
                             log.debug('skipping deleted comment')
@@ -183,12 +177,9 @@ if __name__ == "__main__":
                             log.debug('executing getinfo')
                             handle_getinfo(comment, bgg)
 
-                # this may be a bad idea, but when else to save state?
-                with open(args.config, 'w') as fd:
-                    log.debug('writing config file')
-                    fd.write(yaml.dump(conf, default_flow_style=True))
-
         except (praw.errors.APIException,
                 praw.errors.ClientException,
                 requests.HTTPError) as e:
             log.error('Caught exception: {}'.format(e))
+        except Exception as e:
+            log.error('Exception caught! - {}'.format(e))

@@ -26,6 +26,9 @@ class RedditBot(object):
             self.reddit = praw.Reddit(self.userAgent)
             self.reddit.login(username=self.uid, password=self.passwd)
 
+    def UID(self):
+        return self.uid
+
     def get_comments_to_scan(self, subreddits=None, mentions=True):
         '''get_comments_to_scan creates a number of threads to read comments from the 
         given subreddits and notifications of username mentions.'''
