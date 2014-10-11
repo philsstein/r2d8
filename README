@@ -1,4 +1,16 @@
 In order to run the bot, you need a file called BotConfig.py which looks like the following:
+
+cat > BotConfig.py
 UID=[reddit account login id]
 PASSWD=[password if UID's account]
 subreddits=['list', 'of' 'subreddits', 'to', 'listen', 'to']
+^D
+
+When run the bot creates two sqlite databases, one for BGG URL queries and one for keeping track of comments and responses. The default names are:
+
+    UID-bot.db - the comment database
+    UID-bgg.db - the BGG access cache database
+
+where UID is the UID of the bot, usually "r2d8". 
+
+
