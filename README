@@ -1,0 +1,4 @@
+In order to run the bot, you need a file called BotConfig.py which looks like the following:
+UID=[reddit account login id]
+PASSWD=[password if UID's account]
+subreddits=['list', 'of' 'subreddits', 'to', 'listen', 'to']
