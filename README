@@ -13,4 +13,5 @@ When run the bot creates two sqlite databases, one for BGG URL queries and one f
 
 where UID is the UID of the bot, usually "r2d8". 
 
+Currently the bot acknowledges ^C, but does not exit. One consume thread is not dying for some reason.
 
