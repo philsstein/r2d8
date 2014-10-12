@@ -12,10 +12,9 @@ log = logging.getLogger(__name__)
 
 
 class CommentHandler(object):
-    def __init__(self, reddit, botdb):
-        self._reddit = reddit
+    def __init__(self, UID, botdb):
         self._botdb = botdb
-        self._botname = reddit.UID()
+        self._botname = UID
         self._header = '*^({} issues a series of sophisticated bleeps and whistles...)*\n\n'.format(self._botname)
         self._footer = ('\n\n'
                         '-------------\n'
@@ -27,7 +26,7 @@ class CommentHandler(object):
             'Pathfinder': 'Pathfinder Adventure Card Game: Rise of the Runelords - Base Set'
         }
 
-        dbpath = pjoin(getcwd(), '{}-bgg.db'.format(reddit.UID()))
+        dbpath = pjoin(getcwd(), '{}-bgg.db'.format(self._botname))
         self._bgg = BGG(cache='sqlite://{}?ttl=86400'.format(dbpath))
 
     def getInfo(self, comment):

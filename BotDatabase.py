@@ -16,6 +16,7 @@ class BotDatabase(object):
 
     def add_comment(self, comment):
         log.debug('adding comment {} to database'.format(comment.id))
+        comment.mark_as_read()
         self._connection.execute('INSERT INTO comments VALUES("{}")'.format(comment.id))
         self._connection.commit()
 
