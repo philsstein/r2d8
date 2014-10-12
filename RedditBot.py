@@ -32,16 +32,12 @@ class RedditBot(object):
     def get_comments_to_scan(self, subreddits=None, mentions=True):
         '''get_comments_to_scan creates a number of threads to read comments from the 
         given subreddits and notifications of username mentions.'''
-        # helper thread class to read from a single content generator
-        class _consumer(Thread):
-            def __init__(self, queue, waitTime, source, *source_args):
-                super(_consumer, self).__init__()
+        class _consumeMentions(Thread):
+            def __init__(self, queue, reddit):
+                super(_consumeMentions, self).__init__()
                 self._stop = Event()
                 self._queue = queue
-                self._source = source
-                self._source_args = source_args
-                self._sleep = waitTime
-                self.exit = False
+                self._reddit = reddit
 
             def stop(self):
                 self._stop.set()
@@ -49,25 +45,46 @@ class RedditBot(object):
             def run(self):
                 while True:
                     try:
-                        for item in self._source(*self._source_args):
-                            self._queue.put(item)
+                        for comment in self._reddit.get_mentions():
                             if self._stop.isSet():
                                 return
+                            self._queue.put(comment)
                     except Exception as e:
-                        log.error('Got exception in consume thread: {}'.format(e))
+                        log.error('Got exception in get_mentions thread: {}'.format(e))
                         sleep(5)
+                    # get_mentions does not block
+                    sleep(5)
+    
+        class _consumeComments(Thread):
+            def __init__(self, queue, reddit, subreddits):
+                super(_consumeComments, self).__init__()
+                self._stop = Event()
+                self._queue = queue
+                self._reddit = reddit
+                self._subreddits = subreddits
 
-                    if self._sleep:
-                        sleep(self._sleep)
+            def stop(self):
+                self._stop.set()
+
+            def run(self):
+                while True:
+                    try:
+                        for comment in praw.helpers.comment_stream(self._reddit, self._subreddits):
+                            if self._stop.isSet():
+                                return
+                            self._queue.put(comment)
+                    except Exception as e:
+                        log.error('Got exception in comment_stream thread: {}'.format(e))
+                        sleep(5)
     
         queue = Queue()
         consumers = list()
         if subreddits:
             multi_reddits = self.reddit.get_subreddit('+'.join(subreddits))
-            consumers.append(_consumer(queue, 0, praw.helpers.comment_stream, self.reddit, multi_reddits))
+            consumers.append(_consumeComments(queue, self.reddit, multi_reddits))
         
         if mentions:
-            consumers.append(_consumer(queue, 2, self.reddit.get_mentions))
+            consumers.append(_consumeMentions(queue, self.reddit))
 
         if not consumers:
             log.error('RedditBot has nothing to scan for comments.')
