@@ -38,6 +38,8 @@ class CommentHandler(object):
             log.debug('comment was: {}'.format(body))
             return
 
+        # filter out dups.
+        bolded = list(set(bolded))
         games = []
         not_found = []
 
@@ -76,6 +78,9 @@ class CommentHandler(object):
 
         if comment.subreddit.display_name.lower() == 'boardgamescirclejerk':
             not_found = old_bolded[:]
+            worthwhile = 'worthwhile '
+        else:
+            worthwhile = ''
 
         if not_found:
             log.debug('not found: {}'.format(', '.join(not_found)))
@@ -105,7 +110,8 @@ class CommentHandler(object):
             not_found = ['[{}](http://boardgamegeek.com/geeksearch.php?action=search&objecttype=boardgame&q={}&B1=Go)'.format(
                 n, n) for n in not_found]
             if mode == 'short':
-                infos.append('\n\n-----\nBolded items not found at BGG: {}\n\n'.format(', '.join(not_found)))
+                infos.append('\n\n-----\nBolded items not {}found at BGG: {}\n\n'.format(
+                    worthwhile, ', '.join(not_found)))
             else:
                 infos.append('Bolded items not found at BGG: {}\n\n'.format(', '.join(not_found)))
 
