@@ -3,6 +3,7 @@
 import logging
 import re
 import yaml
+from random import choice
 from os import getcwd
 from os.path import join as pjoin
 from boardgamegeek import BoardGameGeek as BGG
@@ -23,7 +24,10 @@ class CommentHandler(object):
 
         self._gameNameMap = {
             'Dead of Winter': 'Dead of Winter: A Crossroads Game',
-            'Pathfinder': 'Pathfinder Adventure Card Game: Rise of the Runelords - Base Set'
+            'Pathfinder': 'Pathfinder Adventure Card Game: Rise of the Runelords - Base Set',
+            'Descent 2': 'Descent: Journeys in the Dark (Second Edition)',
+            'Seven Wonders': '7 Wonders',
+            'Caverna': 'Caverna: The Cave Farmers'
         }
 
         dbpath = pjoin(getcwd(), '{}-bgg.db'.format(self._botname))
@@ -45,7 +49,11 @@ class CommentHandler(object):
 
         if comment.subreddit.display_name.lower() == 'boardgamescirclejerk':
             old_bolded = bolded[:]
-            bolded = ['Dead of Winter: A Crossroads Game']
+            bolded = choice([
+                ['Dead of Winter: A Crossroads Game'],
+                ['Ginkgopolis'],
+                ['Machi Koro']
+            ])
 
         for game_name in bolded:
             if game_name in self._gameNameMap.keys():
@@ -78,9 +86,6 @@ class CommentHandler(object):
 
         if comment.subreddit.display_name.lower() == 'boardgamescirclejerk':
             not_found = old_bolded[:]
-            worthwhile = 'worthwhile '
-        else:
-            worthwhile = ''
 
         if not_found:
             log.debug('not found: {}'.format(', '.join(not_found)))
@@ -110,8 +115,8 @@ class CommentHandler(object):
             not_found = ['[{}](http://boardgamegeek.com/geeksearch.php?action=search&objecttype=boardgame&q={}&B1=Go)'.format(
                 n, n) for n in not_found]
             if mode == 'short':
-                infos.append('\n\n-----\nBolded items not {}found at BGG: {}\n\n'.format(
-                    worthwhile, ', '.join(not_found)))
+                infos.append('\n\n-----\nBolded items not found at BGG: {}\n\n'.format(
+                    ', '.join(not_found)))
             else:
                 infos.append('Bolded items not found at BGG: {}\n\n'.format(', '.join(not_found)))
 
