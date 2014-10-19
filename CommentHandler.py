@@ -19,7 +19,7 @@ class CommentHandler(object):
         self._header = '*^({} issues a series of sophisticated bleeps and whistles...)*\n\n'.format(self._botname)
         self._footer = ('\n\n'
                         '-------------\n'
-                        '^({} is a bot. Looks a little like a trash can, but you shouldn\'t hold that against him.)'
+                        '^({} is a bot. Looks a little like a trash can, but you shouldn\'t hold that against him.) '
                         '[^Submit ^questions, ^abuse, ^and ^bug ^reports ^here.](/r/r2d8)'.format(self._botname))
 
         self._gameNameMap = {
@@ -33,7 +33,7 @@ class CommentHandler(object):
         dbpath = pjoin(getcwd(), '{}-bgg.db'.format(self._botname))
         self._bgg = BGG(cache='sqlite://{}?ttl=86400'.format(dbpath))
 
-    def getInfo(self, comment):
+    def _getInfoResponseBody(self, comment):
         body = comment.body.encode('utf-8')
         bolded = [b for b in re.findall('\*\*([^\*]+)\*\*', body)]
 
@@ -95,7 +95,6 @@ class CommentHandler(object):
                 game.name.encode('utf-8'), game.year) for game in games])))
         else:
             log.warn('Found no games in comment {}'.format(comment.id))
-            return 
 
         # get the information for each game in a nice tidy list of strings.
         # get the mode if given. Can be short or long or normal. Default is normal.
@@ -120,13 +119,22 @@ class CommentHandler(object):
             else:
                 infos.append('Bolded items not found at BGG: {}\n\n'.format(', '.join(not_found)))
 
+        response = None
         if len(infos):
             if mode == 'short':
-                comment.reply(self._header + '\n'.join([i for i in infos]) + self._footer)
+                response = self._header + '\n'.join([i for i in infos]) + self._footer
             else:
-                comment.reply(self._header + '-----\n'.join([i for i in infos]) + self._footer)
+                response = self._header + '-----\n'.join([i for i in infos]) + self._footer
 
+        return response
+
+    def getInfo(self, comment):
+        response = self._getInfoResponseBody(comment)
+        if response:
+            comment.reply(response)
             log.info('Replied to info request for comment {}'.format(comment.id))
+        else:
+            log.warn('Did not find anything to reply to in comment'.format(comment.id))
 
     def _getShortInfos(self, games):
         infos = list()
@@ -179,7 +187,62 @@ class CommentHandler(object):
         return infos
 
     def repairComment(self, comment):
-        commet.reply('not yet implemented')
+        '''Look for maps from missed game names to actual game names. If 
+        found repair orginal comment.'''
+        # 
+        # The repair is done by replacing the new games names with the old (wrong)
+        # games names in the original /u/r2d8 response, then recreating the entire
+        # post by regenerating it with the new (fixed) bolded game names. The just replacing
+        # the orginal response with the new one.
+        #
+        log.debug('Got repair response, id {}'.format(comment.id))
+
+        if comment.is_root:
+            # error here - this comment should be in response to a u/r2d8 comment.
+            log.info('Got a repair comment as root, ignoring.')
+            return
+
+        parent = comment.reddit_session.get_info(thing_id=comment.parent_id)
+        if parent.author.name != self._botname:
+            log.info('Parent of repair comment is not authored by the bot, ignoring.')
+            return 
+
+        # Look for patterns of **something**=**somethingelse**. This line creates a dict 
+        # of something: somethingelse for each one pattern found. 
+        repairs = {match[0]: match[1] for match in re.findall(
+            '\*\*(\s|\w+)\*\*=\*\*(\s|\w+)\*\*', comment.body.encode('utf-8'))}
+        
+        pbody = parent.body.encode('utf-8')
+        for wrongName, repairedName in repairs.iteritems():
+            # check to see if it's actually a game.
+            tmp_game = self._bgg.game(name=repairedName)  # with caching it's ok to check twice
+            if tmp_game:
+                # In the parent body we want to replace [NAME](http://... with **NAME**(http://
+                pbody = pbody.replace('[' + wrongName + ']', '**' + repairedName + '**')
+
+        # Now re-bold the not found strings so they are re-searched or re-added to the not found list.
+        for nf in re.findall('\[([^\]]+)]\(http://boardgamegeek.com/geeksearch.php', pbody):
+            pbody += ' **{}**'.format(nf)
+
+        # now re-insert the original command to retain the mode. 
+        grandparent = parent.reddit_session.get_info(thing_id=parent.parent_id)
+        modes = list()
+        if not grandparent:
+            log.error('Cannot find original GP post. Assuming normal mode.')
+        else:
+            modes = re.findall('getinfo\s(\w+)', grandparent.body.encode('utf-8'))
+
+        if modes:
+            pbody += '/u/{} getinfo {}'.format(self._botname, modes[0])
+        else:
+            pbody += '/u/{} getinfo'.format(self._botname)
+
+        parent = parent.edit(pbody)
+        new_reply = self._getInfoResponseBody(parent)
+
+        # should check for Editiable class somehow here. GTL
+        log.debug('Replacing bot comment {} with: {}'.format(parent.id, new_reply))
+        parent.edit(new_reply)
 
     def xyzzy(self, comment):
         comment.reply('Nothing happens.')
