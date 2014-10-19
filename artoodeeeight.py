@@ -41,17 +41,17 @@ if __name__ == '__main__':
         'xyzzy': ch.xyzzy
     }
     while True:
-        try:
-            for comment in reddit.get_mentions():
-                if not bdb.comment_exists(comment):
-                    bdb.add_comment(comment)
-                    for cmd in botcmds.findall(comment.body):
-                        if cmd in cmdmap:
-                            cmdmap[cmd](comment)
-                        else:
-                            log.info('Got unknown command: {}'.format(cmd))
-        except Exception as e:
-            log.error('Caught exception: {}'.format(e))
+        # try:
+        for comment in list(reddit.get_mentions()) + list(reddit.get_unread()):
+            if not bdb.comment_exists(comment):
+                bdb.add_comment(comment)
+                for cmd in botcmds.findall(comment.body):
+                    if cmd in cmdmap:
+                        cmdmap[cmd](comment)
+                    else:
+                        log.info('Got unknown command: {}'.format(cmd))
+        # except Exception as e:
+        #    log.error('Caught exception: {}'.format(e))
 
         # get_mentions is non-blocking
         sleep(2)
