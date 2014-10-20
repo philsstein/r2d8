@@ -30,19 +30,28 @@ if __name__ == '__main__':
     log.info('connecting to reddit with uid {}'.format(UID))
     reddit = praw.Reddit('{} bot for linking to boardgame information, v 0.1. '
                          '/u/phil_s_stein see /r/{}'.format(UID, UID))
+    log.info('Connected. Logging in as {}'.format(UID))
     reddit.login(username=UID, password=PASSWD)
+    log.info('Logged in.')
     
     bdb = BotDatabase(args.database)
+    log.info('Bot database opened/created.')
     ch = CommentHandler(UID, bdb)
+    log.info('Comment/notification handler created.')
     botcmds = re.compile('/u/{}\s(\w+)'.format(UID, UID))
     cmdmap = {
         'getinfo': ch.getInfo,
         'repair': ch.repairComment,
-        'xyzzy': ch.xyzzy
+        'xyzzy': ch.xyzzy,
+        'alias': ch.alias,
+        'getparentinfo': ch.getParentInfo
     }
+    log.info('Waiting for new PMs and/or notifications.')
     while True:
         try:
+            # for comment in reddit.get_mentions():
             for comment in list(reddit.get_mentions()) + list(reddit.get_unread()):
+                # log.debug('got {}'.format(comment.id))
                 if not bdb.comment_exists(comment):
                     bdb.add_comment(comment)
                     for cmd in botcmds.findall(comment.body):
@@ -50,8 +59,9 @@ if __name__ == '__main__':
                             cmdmap[cmd](comment)
                         else:
                             log.info('Got unknown command: {}'.format(cmd))
+
         except Exception as e:
            log.error('Caught exception: {}'.format(e))
 
         # get_mentions is non-blocking
-        sleep(2)
+        sleep(5)
