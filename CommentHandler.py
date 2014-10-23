@@ -27,15 +27,12 @@ class CommentHandler(object):
 
     def _getInfoResponseBody(self, comment, mode=None):
         body = comment.body
-        bolded = [b for b in re.findall(u'\*\*([^\*]+)\*\*', body)]
+        bolded = re.findall(u'\*\*([^\*]+)\*\*', body)
 
         if not bolded:
             log.warn(u'Got getinfo command, but nothing is bolded. Ignoring comment.')
             log.debug(u'comment was: {}'.format(body))
             return
-
-        # filter out dups.
-        bolded = list(set(bolded))
 
         # convert aliases to real names. It may be better to do this after we don't find the 
         # game. Oh, well.
@@ -44,6 +41,9 @@ class CommentHandler(object):
             if real_name:
                 bolded[i] = real_name
     
+        # filter out dups.
+        bolded = list(set(bolded))
+
         games = []
         not_found = []
 
@@ -59,19 +59,29 @@ class CommentHandler(object):
         for game_name in bolded:
             log.info(u'asking BGG for info on {}'.format(game_name))
             try:
-                games_of_this_name = []
-                for title in self._bgg.search(game_name):
-                    if title.type == u'boardgame':
-                        if title.name == game_name:
-                            # search returns a game even if the alternate game name is the name.
-                            tmp_game = self._bgg.game(name=None, game_id=title.id)
-                            if tmp_game.name == game_name:
-                                games_of_this_name.append(self._bgg.game(name=None,
-                                                                         game_id=title.id))
+                # games_of_this_name = []
+                # for title in self._bgg.search(game_name):
+                #     if title.type == u'boardgame':
+                #         if title.name == game_name:
+                #             # search returns a game even if the alternate game name is the name.
+                #             tmp_game = self._bgg.game(name=None, game_id=title.id)
+                #             if tmp_game.name == game_name:
+                #                 games_of_this_name.append(self._bgg.game(name=None,
+                #                                                          game_id=title.id))
    
-                if games_of_this_name:
-                    games_of_this_name.sort(key=lambda g: g.year, reverse=True)
-                    games += games_of_this_name
+                # if games_of_this_name:
+                #     games_of_this_name.sort(key=lambda g: g.year, reverse=True)
+                #     games += games_of_this_name
+
+                # now that the BGG lib gives us the newest game when there are dups, 
+                # just use that. This has the advantage of being case insensitve and 
+                # supporting alternate names and languages.
+                game = self._bgg.game(game_name)
+                if game:
+                    games.append(self._bgg.game(game_name))
+                else:
+                    not_found.append(game_name)
+
     
             except boardgamegeek.exceptions.BoardGameGeekError:
                 log.error(u'Error getting info from BGG on {}'.format(game_name))
@@ -79,8 +89,7 @@ class CommentHandler(object):
     
         # we now have all the games. 
         mode = u'short' if len(games) > 6 else mode
-        log.debug(u'bolded: {}, game names: {}'.format(bolded, [game.name for game in games]))
-        not_found = list(set(bolded) - set([game.name for game in games]))
+        # not_found = list(set(bolded) - set([game.name for game in games]))
 
         if comment.subreddit.display_name.lower() == u'boardgamescirclejerk':
             not_found = old_bolded

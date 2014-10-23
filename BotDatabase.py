@@ -7,7 +7,6 @@ class BotDatabase(object):
     def __init__(self, path):
         super(BotDatabase, self).__init__()
         self._connection = sqlite3.connect(path)
-        self._connection.text_factory = str
 
         stmt = u'SELECT name FROM sqlite_master WHERE type="table" AND name="comments"'
         q = self._connection.execute(stmt).fetchall()
