@@ -3,6 +3,7 @@
 import logging
 import re
 import yaml
+from urllib2 import quote
 from random import choice
 from os import getcwd
 from os.path import join as pjoin
@@ -56,29 +57,17 @@ class CommentHandler(object):
             old_bolded = set(bolded) ^ set(cjgames)
             bolded = choice(cjgames)
 
+        seen = set()
         for game_name in bolded:
             log.info(u'asking BGG for info on {}'.format(game_name))
             try:
-                # games_of_this_name = []
-                # for title in self._bgg.search(game_name):
-                #     if title.type == u'boardgame':
-                #         if title.name == game_name:
-                #             # search returns a game even if the alternate game name is the name.
-                #             tmp_game = self._bgg.game(name=None, game_id=title.id)
-                #             if tmp_game.name == game_name:
-                #                 games_of_this_name.append(self._bgg.game(name=None,
-                #                                                          game_id=title.id))
-   
-                # if games_of_this_name:
-                #     games_of_this_name.sort(key=lambda g: g.year, reverse=True)
-                #     games += games_of_this_name
-
-                # now that the BGG lib gives us the newest game when there are dups, 
-                # just use that. This has the advantage of being case insensitve and 
-                # supporting alternate names and languages.
                 game = self._bgg.game(game_name)
                 if game:
-                    games.append(self._bgg.game(game_name))
+                    if not game.name in seen:
+                        games.append(self._bgg.game(game_name))
+                    # don't add dups. This can happen when the same game is calledby two valid
+                    # names in a post. 
+                    seen.add(game.name)   
                 else:
                     not_found.append(game_name)
 
@@ -120,7 +109,7 @@ class CommentHandler(object):
         # append not found string if we didn't find a bolded string.
         if not_found:
             not_found = [u'[{}](http://boardgamegeek.com/geeksearch.php?action=search&objecttype=boardgame&q={}&B1=Go)'.format(
-                n, n) for n in not_found]
+                n, quote(n)) for n in not_found]
             if mode == u'short':
                 infos.append(u'\n\n-----\nBolded items not found at BGG: {}\n\n'.format(
                    u', '.join(not_found)))
@@ -231,7 +220,7 @@ class CommentHandler(object):
             log.info(u'Repairing {} --> {}'.format(wrongName, repairedName))
             alias = self._botdb.get_name_from_alias(repairedName)
             tmp_name = alias if alias else repairedName
-            tmp_game = self._bgg.game(name=tmp_name)  # with caching it's ok to check twice
+            tmp_game = self._bgg.game(tmp_name)  # with caching it's ok to check twice
             if tmp_game:
                 # In the parent body we want to replace [NAME](http://... with **NAME**(http://
                 pbody = pbody.replace(u'[' + wrongName + u']', u'**' + tmp_name + u'**')
