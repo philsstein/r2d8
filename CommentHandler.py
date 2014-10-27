@@ -140,18 +140,32 @@ class CommentHandler(object):
 
     def _getShortInfos(self, games):
         infos = list()
-        for game in games:                            
-            infos.append(u' * [**{}**](http://boardgamegeek.com/boardgame/{}) '
-                         u' ({}) by {}'.format(game.name, game.id, game.year,
-                                              u', '.join(getattr(game, u'designers', u'Unknown'))))
+        for game in games:
+            if game.min_players == game.max_players:
+                players = '{} p'.format(game.min_players)
+            else:
+                players = '{}-{} p'.format(game.min_players, game.max_players)
+
+            info = (u' * Details for [**{}**](http://boardgamegeek.com/boardgame/{}) '
+                    u' ({}) by {}. {}; {} mins'.format(
+                        game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
+                        players, game.playing_time))
+            infos.append(info)
+
         return infos
 
     def _getStdInfos(self, games):
         infos = list()
         for game in games:
+            if game.min_players == game.max_players:
+                players = '{} player{}'.format(game.min_players, 's' if game.min_players != 1 else '')
+            else:
+                players = '{}-{} players'.format(game.min_players, game.max_players)
+
             info = (u'Details for [**{}**](http://boardgamegeek.com/boardgame/{}) '
-                    u' ({}) by {}\n\n'.format(game.name, game.id, game.year,
-                                             u', '.join(getattr(game, u'designers', u'Unknown'))))
+                    u' ({}) by {}. {}; {} minutes\n\n'.format(
+                        game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
+                        players, game.playing_time))
             data = u', '.join(getattr(game, u'mechanics', u''))
             if data:
                 info += u' * Mechanics: {}\n'.format(data)
@@ -163,15 +177,17 @@ class CommentHandler(object):
     
             log.debug(u'adding info: {}'.format(info))
             infos.append(info)
-    
+   
         return infos
 
     def _getLongInfos(self, games):
         infos = list()
         for game in games:
             info = (u'Details about [**{}**](http://boardgamegeek.com/boardgame/{}) '
-                    u' ({}) by {}\n\n'.format(game.name, game.id, game.year,
+                    u' ({}) by {}'.format(game.name, game.id, game.year,
                                              u', '.join(getattr(game, u'designers', u'Unknown'))))
+            info += u', {} - {} players, {} minutes\n\n'.format(game.min_players, game.max_players,
+                                                             game.playing_time)
             data = u', '.join(getattr(game, u'mechanics', u''))
             if data:
                 info += u' * Mechanics: {}\n'.format(data)
