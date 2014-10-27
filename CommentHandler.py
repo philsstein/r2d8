@@ -111,10 +111,10 @@ class CommentHandler(object):
             not_found = [u'[{}](http://boardgamegeek.com/geeksearch.php?action=search&objecttype=boardgame&q={}&B1=Go)'.format(
                 n, quote(n)) for n in not_found]
             if mode == u'short':
-                infos.append(u'\n\n-----\nBolded items not found at BGG: {}\n\n'.format(
+                infos.append(u'\n\n-----\nBolded items not found at BGG (click to search): {}\n\n'.format(
                    u', '.join(not_found)))
             else:
-                infos.append(u'Bolded items not found at BGG: {}\n\n'.format(u', '.join(not_found)))
+                infos.append(u'Bolded items not found at BGG (click to search): {}\n\n'.format(u', '.join(not_found)))
 
         response = None
         if len(infos):
