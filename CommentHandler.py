@@ -3,7 +3,7 @@
 import logging
 import re
 import yaml
-from urllib2 import quote
+from urllib2 import quote, unquote
 from random import choice
 from os import getcwd
 from os.path import join as pjoin
@@ -44,6 +44,7 @@ class CommentHandler(object):
     
         # filter out dups.
         bolded = list(set(bolded))
+        bolded = [unquote(b) for b in bolded]
 
         games = []
         not_found = []
@@ -146,7 +147,7 @@ class CommentHandler(object):
             else:
                 players = '{}-{} p'.format(game.min_players, game.max_players)
 
-            info = (u' * Details for [**{}**](http://boardgamegeek.com/boardgame/{}) '
+            info = (u' * [**{}**](http://boardgamegeek.com/boardgame/{}) '
                     u' ({}) by {}. {}; {} mins'.format(
                         game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
                         players, game.playing_time))
