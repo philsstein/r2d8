@@ -26,10 +26,54 @@ class CommentHandler(object):
         dbpath = pjoin(getcwd(), u'{}-bgg.db'.format(self._botname))
         self._bgg = BGG(cache=u'sqlite://{}?ttl=86400'.format(dbpath))
 
+    def _bggQueryGame(self, name):
+        '''Try "name", then if not found try a few other small things in an effort to find it.'''
+        name = name.lower().strip()   # GTL extra space at ends shouldn't be matching anyway, fix this.
+        if len(name) > 32:
+            return None
+
+        game = self._bgg.game(name)
+        if game:
+            return game
+        
+        # embedded url? If so, extract.
+        log.debug('Looking for embedded URL')
+        m = re.search('\[([^]]*)\]', name)
+        if m:
+            name = m.group(1)
+            game = self._bgg.game(name)
+            if game:
+                return game
+
+        # note: unembedded from here down
+        # remove 'the's. 
+        log.debug('removing "the"s')
+        tmpname = re.sub('^the ', '', name)
+        tmpname = re.sub('\sthe\s', ' ', tmpname)
+        if tmpname != name:
+            game = self._bgg.game(tmpname)
+            if game:
+                return game
+
+        # add a "the" at start.
+        log.debug('adding "the" at start')
+        game = self._bgg.game('The ' + name)
+        if game:
+            return game
+
+        # punct? 
+        log.debug('removing punctuation')
+        tmpname = re.sub('[?!.:,]*', '', name)
+        if tmpname != name:
+            game = self._bgg.game(tmpname)
+            if game:
+                return game
+
+
     def _getInfoResponseBody(self, comment, mode=None):
         body = comment.body
-        bolded = re.findall(u'\*\*([^\*]+)\*\*', body)
-
+        # bolded = re.findall(u'\*\*([^\*]+)\*\*', body)
+        bolded = re.findall(u'\*\*([\w][\w\s:?,!\'()\[\]]*[\w:?,!\'()\[\]])\*\*', body)  # Now I've got two problems.
         if not bolded:
             log.warn(u'Got getinfo command, but nothing is bolded. Ignoring comment.')
             log.debug(u'comment was: {}'.format(body))
@@ -62,13 +106,14 @@ class CommentHandler(object):
         for game_name in bolded:
             log.info(u'asking BGG for info on {}'.format(game_name))
             try:
-                game = self._bgg.game(game_name)
+                # game = self._bgg.game(game_name)
+                game = self._bggQueryGame(game_name)
                 if game:
                     if not game.name in seen:
-                        games.append(self._bgg.game(game_name))
+                        games.append(game)
                     # don't add dups. This can happen when the same game is calledby two valid
                     # names in a post. 
-                    seen.add(game.name)   
+                    seen.add(game.name)
                 else:
                     not_found.append(game_name)
 
