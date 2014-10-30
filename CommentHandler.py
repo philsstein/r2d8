@@ -29,7 +29,8 @@ class CommentHandler(object):
     def _bggQueryGame(self, name):
         '''Try "name", then if not found try a few other small things in an effort to find it.'''
         name = name.lower().strip()   # GTL extra space at ends shouldn't be matching anyway, fix this.
-        if len(name) > 32:
+        if len(name) > 128:
+            log.warn('Got too long game name: {}'.format(name))
             return None
 
         game = self._bgg.game(name)
@@ -99,7 +100,7 @@ class CommentHandler(object):
                 [u'Ginkgopolis'],
                 [u'Machi Koro']
             ]
-            old_bolded = set(bolded) ^ set(cjgames)
+            old_bolded = set(bolded) ^ set([g[0] for g in cjgames])
             bolded = choice(cjgames)
 
         seen = set()
