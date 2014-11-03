@@ -2,7 +2,6 @@
 
 import logging
 import re
-import yaml
 from urllib2 import quote, unquote
 from random import choice
 from os import getcwd
@@ -36,7 +35,7 @@ class CommentHandler(object):
         game = self._bgg.game(name)
         if game:
             return game
-        
+
         # embedded url? If so, extract.
         log.debug('Looking for embedded URL')
         m = re.search('\[([^]]*)\]', name)
@@ -47,7 +46,7 @@ class CommentHandler(object):
                 return game
 
         # note: unembedded from here down
-        # remove 'the's. 
+        # remove 'the's
         log.debug('removing "the"s')
         tmpname = re.sub('^the ', '', name)
         tmpname = re.sub('\sthe\s', ' ', tmpname)
@@ -62,14 +61,13 @@ class CommentHandler(object):
         if game:
             return game
 
-        # punct? 
+        # punct?
         log.debug('removing punctuation')
         tmpname = re.sub('[?!.:,]*', '', name)
         if tmpname != name:
             game = self._bgg.game(tmpname)
             if game:
                 return game
-
 
     def _getInfoResponseBody(self, comment, mode=None):
         body = comment.body
@@ -80,13 +78,13 @@ class CommentHandler(object):
             log.debug(u'comment was: {}'.format(body))
             return
 
-        # convert aliases to real names. It may be better to do this after we don't find the 
+        # convert aliases to real names. It may be better to do this after we don't find the
         # game. Oh, well.
         for i in xrange(len(bolded)):
             real_name = self._botdb.get_name_from_alias(bolded[i])
             if real_name:
                 bolded[i] = real_name
-    
+
         # filter out dups.
         bolded = list(set(bolded))
         bolded = [unquote(b) for b in bolded]
@@ -110,20 +108,19 @@ class CommentHandler(object):
                 # game = self._bgg.game(game_name)
                 game = self._bggQueryGame(game_name)
                 if game:
-                    if not game.name in seen:
+                    if game.name not in seen:
                         games.append(game)
                     # don't add dups. This can happen when the same game is calledby two valid
-                    # names in a post. 
+                    # names in a post.
                     seen.add(game.name)
                 else:
                     not_found.append(game_name)
 
-    
             except boardgamegeek.exceptions.BoardGameGeekError:
                 log.error(u'Error getting info from BGG on {}'.format(game_name))
                 continue
-    
-        # we now have all the games. 
+
+        # we now have all the games.
         mode = u'short' if len(games) > 6 else mode
         # not_found = list(set(bolded) - set([game.name for game in games]))
 
@@ -135,7 +132,7 @@ class CommentHandler(object):
 
         if games:
             log.debug(u'Found games {}'.format(u','.join([u'{} ({})'.format(
-                game.name, game.year) for game in games])))
+                g.name, g.year) for g in games])))
         else:
             log.warn(u'Found no games in comment {}'.format(comment.id))
 
@@ -155,11 +152,12 @@ class CommentHandler(object):
 
         # append not found string if we didn't find a bolded string.
         if not_found:
-            not_found = [u'[{}](http://boardgamegeek.com/geeksearch.php?action=search&objecttype=boardgame&q={}&B1=Go)'.format(
-                n, quote(n)) for n in not_found]
+            not_found = [u'[{}](http://boardgamegeek.com/geeksearch.php?action=search'
+                         '&objecttype=boardgame&q={}&B1=Go)'.format(
+                             n, quote(n)) for n in not_found]
             if mode == u'short':
-                infos.append(u'\n\n-----\nBolded items not found at BGG (click to search): {}\n\n'.format(
-                   u', '.join(not_found)))
+                infos.append(u'\n\n-----\nBolded items not found at BGG (click to '
+                             u'search): {}\n\n'.format(u', '.join(not_found)))
             else:
                 infos.append(u'Bolded items not found at BGG (click to search): {}\n\n'.format(u', '.join(not_found)))
 
@@ -221,10 +219,10 @@ class CommentHandler(object):
                 game.rating_average, game.users_rated, people)
             data = u', '.join([u'{}: {}'.format(r[u'friendlyname'], r[u'value']) for r in game.ranks])
             info += u' * {}\n\n'.format(data)
-    
+
             log.debug(u'adding info: {}'.format(info))
             infos.append(info)
-   
+
         return infos
 
     def _getLongInfos(self, games):
@@ -232,9 +230,9 @@ class CommentHandler(object):
         for game in games:
             info = (u'Details about [**{}**](http://boardgamegeek.com/boardgame/{}) '
                     u' ({}) by {}'.format(game.name, game.id, game.year,
-                                             u', '.join(getattr(game, u'designers', u'Unknown'))))
-            info += u', {} - {} players, {} minutes\n\n'.format(game.min_players, game.max_players,
-                                                             game.playing_time)
+                                          u', '.join(getattr(game, u'designers', u'Unknown'))))
+            info += u', {} - {} players, {} minutes\n\n'.format(
+                game.min_players, game.max_players, game.playing_time)
             data = u', '.join(getattr(game, u'mechanics', u''))
             if data:
                 info += u' * Mechanics: {}\n'.format(data)
@@ -243,7 +241,7 @@ class CommentHandler(object):
                 game.rating_average, game.users_rated, people)
             data = u', '.join(['{}: {}'.format(r[u'friendlyname'], r[u'value']) for r in game.ranks])
             info += u' * {}\n\n'.format(data)
-   
+
             info += u'Description:\n\n{}\n\n'.format(game.description)
 
             log.debug(u'adding info: {}'.format(info))
@@ -252,9 +250,9 @@ class CommentHandler(object):
         return infos
 
     def repairComment(self, comment):
-        '''Look for maps from missed game names to actual game names. If 
+        '''Look for maps from missed game names to actual game names. If
         found repair orginal comment.'''
-        # 
+        #
         # The repair is done by replacing the new games names with the old (wrong)
         # games names in the original /u/r2d8 response, then recreating the entire
         # post by regenerating it with the new (fixed) bolded game names. The just replacing
@@ -270,13 +268,13 @@ class CommentHandler(object):
         parent = comment.reddit_session.get_info(thing_id=comment.parent_id)
         if parent.author.name != self._botname:
             log.info(u'Parent of repair comment is not authored by the bot, ignoring.')
-            return 
+            return
 
-        # Look for patterns of **something**=**somethingelse**. This line creates a dict 
-        # of something: somethingelse for each one pattern found. 
+        # Look for patterns of **something**=**somethingelse**. This line creates a dict
+        # of something: somethingelse for each one pattern found.
         repairs = {match[0]: match[1] for match in re.findall(
             u'\*\*([^\*]+)\*\*=\*\*([^\*]+)\*\*', comment.body)}
-        
+
         pbody = parent.body
         for wrongName, repairedName in repairs.iteritems():
             # check to see if it's actually a game.
@@ -294,7 +292,7 @@ class CommentHandler(object):
         for nf in re.findall(u'\[([\w|\s]+)]\(http://boardgamegeek.com/geeksearch.php', pbody):
             pbody += u' **{}**'.format(nf)
 
-        # now re-insert the original command to retain the mode. 
+        # now re-insert the original command to retain the mode.
         grandparent = parent.reddit_session.get_info(thing_id=parent.parent_id)
         modes = list()
         if not grandparent:
@@ -326,7 +324,7 @@ class CommentHandler(object):
             # error here - this comment should be in response to a u/r2d8 comment.
             log.info(u'Got a repair comment as root, ignoring.')
             return
-    
+
         m = re.search(u'getparentinfo\s(\w+)', comment.body, re.IGNORECASE)
         mode = None
         if m:
