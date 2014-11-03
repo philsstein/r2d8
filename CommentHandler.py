@@ -120,6 +120,9 @@ class CommentHandler(object):
                 log.error(u'Error getting info from BGG on {}'.format(game_name))
                 continue
 
+        # sort by game name because why not?
+        games = sorted(games, key=lambda g: g.name)
+
         # we now have all the games.
         mode = u'short' if len(games) > 6 else mode
         # not_found = list(set(bolded) - set([game.name for game in games]))
