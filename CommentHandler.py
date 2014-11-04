@@ -36,6 +36,13 @@ class CommentHandler(object):
         if game:
             return game
 
+        # Well OK, how about game ID?
+        if not re.search(u'([^\d]+)', name):  # all digits is probably an ID
+            game = self._bgg.game(name=None, game_id=name)
+            if game:
+                log.debug('found game {} via searching by ID'.format(name))
+                return game
+
         # embedded url? If so, extract.
         log.debug('Looking for embedded URL')
         m = re.search('\[([^]]*)\]', name)
