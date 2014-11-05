@@ -180,6 +180,14 @@ class CommentHandler(object):
 
         return response
 
+    def _getPlayers(self, game):
+        if game.min_players == game.max_players:
+            players = '{} p'.format(game.min_players)
+        else:
+            players = '{}-{} p'.format(game.min_players, game.max_players)
+
+        return players
+
     def getInfo(self, comment, replyTo=None, mode=None):
         '''Reply to comment with game information. If replyTo isot given reply to original else
         reply to given comment.'''
@@ -196,11 +204,6 @@ class CommentHandler(object):
     def _getShortInfos(self, games):
         infos = list()
         for game in games:
-            if game.min_players == game.max_players:
-                players = '{} p'.format(game.min_players)
-            else:
-                players = '{}-{} p'.format(game.min_players, game.max_players)
-
             info = (u' * [**{}**](http://boardgamegeek.com/boardgame/{}) '
                     u' ({}) by {}. {}; {} mins'.format(
                         game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
@@ -212,11 +215,7 @@ class CommentHandler(object):
     def _getStdInfos(self, games):
         infos = list()
         for game in games:
-            if game.min_players == game.max_players:
-                players = '{} player{}'.format(game.min_players, 's' if game.min_players != 1 else '')
-            else:
-                players = '{}-{} players'.format(game.min_players, game.max_players)
-
+            players = self._getPlayers(game)
             info = (u'Details for [**{}**](http://boardgamegeek.com/boardgame/{}) '
                     u' ({}) by {}. {}; {} minutes\n\n'.format(
                         game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
@@ -238,18 +237,18 @@ class CommentHandler(object):
     def _getLongInfos(self, games):
         infos = list()
         for game in games:
-            info = (u'Details about [**{}**](http://boardgamegeek.com/boardgame/{}) '
-                    u' ({}) by {}'.format(game.name, game.id, game.year,
-                                          u', '.join(getattr(game, u'designers', u'Unknown'))))
-            info += u', {} - {} players, {} minutes\n\n'.format(
-                game.min_players, game.max_players, game.playing_time)
+            players = self._getPlayers(game)
+            info = (u'Details for [**{}**](http://boardgamegeek.com/boardgame/{}) '
+                    u' ({}) by {}. {}; {} minutes\n\n'.format(
+                        game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
+                        players, game.playing_time))
             data = u', '.join(getattr(game, u'mechanics', u''))
             if data:
                 info += u' * Mechanics: {}\n'.format(data)
             people = u'people' if game.users_rated > 1 else u'person'
             info += u' * Average rating is {}; rated by {} {}\n'.format(
                 game.rating_average, game.users_rated, people)
-            data = u', '.join(['{}: {}'.format(r[u'friendlyname'], r[u'value']) for r in game.ranks])
+            data = u', '.join([u'{}: {}'.format(r[u'friendlyname'], r[u'value']) for r in game.ranks])
             info += u' * {}\n\n'.format(data)
 
             info += u'Description:\n\n{}\n\n'.format(game.description)
