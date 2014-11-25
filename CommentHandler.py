@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8
 
 import logging
 import re
@@ -68,18 +69,27 @@ class CommentHandler(object):
         if game:
             return game
 
-        # punct?
-        log.debug('removing punctuation')
-        tmpname = re.sub('[?!.:,]*', '', name)
-        if tmpname != name:
-            game = self._bgg.game(tmpname)
-            if game:
-                return game
+        # various substistutions.
+        subs = [
+            ('[?!.:,]*', '', 'removing punctuation'),
+            ('\sand\s', ' & ', 'and --> &'),
+            ('\s&\s', ' and ', '& --> and')
+        ]
+        for search, sub, logmess in subs:
+            log.debug(logmess)
+            tmpname = re.sub(search, sub, name)
+            if tmpname != name:
+                game = self._bgg.game(tmpname)
+                if game:
+                    return game
+
+        return None
 
     def _getInfoResponseBody(self, comment, mode=None):
         body = comment.body
         # bolded = re.findall(u'\*\*([^\*]+)\*\*', body)
-        bolded = re.findall(u'\*\*([\w][\w\s:?,!\'()\[\]]*[\w:?,!\'()\[\]])\*\*', body)  # Now I've got two problems.
+        # Now I've got two problems.
+        bolded = re.findall(u'\*\*([\w][\w\s:\-?$,!\'–&()\[\]]*[\w\.:\-?$,!\'–&()\[\]])\*\*', body, flags=re.UNICODE)
         if not bolded:
             log.warn(u'Got getinfo command, but nothing is bolded. Ignoring comment.')
             log.debug(u'comment was: {}'.format(body))
@@ -204,6 +214,7 @@ class CommentHandler(object):
     def _getShortInfos(self, games):
         infos = list()
         for game in games:
+            players = self._getPlayers(game)
             info = (u' * [**{}**](http://boardgamegeek.com/boardgame/{}) '
                     u' ({}) by {}. {}; {} mins'.format(
                         game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
@@ -290,7 +301,7 @@ class CommentHandler(object):
             log.info(u'Repairing {} --> {}'.format(wrongName, repairedName))
             alias = self._botdb.get_name_from_alias(repairedName)
             tmp_name = alias if alias else repairedName
-            tmp_game = self._bgg.game(tmp_name)  # with caching it's ok to check twice
+            tmp_game = self._bggQueryGame(tmp_name)  # with caching it's ok to check twice
             if tmp_game:
                 # In the parent body we want to replace [NAME](http://... with **NAME**(http://
                 pbody = pbody.replace(u'[' + wrongName + u']', u'**' + tmp_name + u'**')
