@@ -89,7 +89,7 @@ class CommentHandler(object):
         body = comment.body
         # bolded = re.findall(u'\*\*([^\*]+)\*\*', body)
         # Now I've got two problems.
-        bolded = re.findall(u'\*\*([\w][\w\s:\-?$,!\'–&()\[\]]*[\w\.:\-?$,!\'–&()\[\]])\*\*', body, flags=re.UNICODE)
+        bolded = re.findall(u'\*\*([\w][\w\.\s:\-?$,!\'–&()\[\]]*[\w\.:\-?$,!\'–&()\[\]])\*\*', body, flags=re.UNICODE)
         if not bolded:
             log.warn(u'Got getinfo command, but nothing is bolded. Ignoring comment.')
             log.debug(u'comment was: {}'.format(body))
