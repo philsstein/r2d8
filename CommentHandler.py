@@ -3,11 +3,13 @@
 
 import logging
 import re
+from time import sleep
 from urllib2 import quote, unquote
 from random import choice
 from os import getcwd
 from os.path import join as pjoin
 from boardgamegeek import BoardGameGeek as BGG
+from boardgamegeek.api import BoardGameGeekNetworkAPI
 import boardgamegeek
 
 log = logging.getLogger(__name__)
@@ -82,6 +84,47 @@ class CommentHandler(object):
                 game = self._bgg.game(tmpname)
                 if game:
                     return game
+
+        # well OK - let's pull out the heavy guns and use the search API.
+        # this will give us a bunch of things to sort through, but hopefully
+        # find something.
+        return self._bggSearchGame(name)
+
+    def _bggSearchGame(self, name):
+        '''Use the much wider search API to find the game.'''
+        items = self._bgg.search(name, search_type=BoardGameGeekNetworkAPI.SEARCH_BOARD_GAME, exact=True)
+        if len(items) == 1:
+            log.debug('Found exact match using search().')
+            return self._bgg.game(items[0].name)
+
+        # exact match not found, trying sloppy match
+        items = self._bgg.search(name, search_type=BoardGameGeekNetworkAPI.SEARCH_BOARD_GAME)
+        if not len(items):
+            log.debug('Found no matches at all using search().')
+            return None
+
+        if len(items) == 1:
+            log.debug('Found onw matce using search().')
+            return self._bgg.game(items[0].name)
+
+        # assume most owned is what people want. Is this good? Dunno.
+        most_owned = None
+        for i in items:
+            game = self._bgg.game(None, game_id=i.id)
+            # GTL the lib throws an uncaught exception if BGG assessed too quickly.
+            # GTL - this needs to be fixed in the library.
+            sleep(1)
+            if getattr(game, 'expansion', False):
+                log.debug('ignoring expansion')
+                continue
+            else:
+                if not most_owned:
+                    most_owned = game
+                else:
+                    most_owned = game if getattr(game, 'owned', 0) > most_owned.owned else most_owned
+
+        if most_owned:
+            return most_owned
 
         return None
 
