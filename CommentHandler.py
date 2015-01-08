@@ -153,9 +153,9 @@ class CommentHandler(object):
             cjgames = [
                 [u'Dead of Winter: A Crossroads Game'],
                 [u'Ginkgopolis'],
-                [u'Machi Koro']
+                [u'Machi Koro'],
+                [u'Scythe']
             ]
-            old_bolded = set(bolded) ^ set([g[0] for g in cjgames])
             bolded = choice(cjgames)
 
         seen = set()
@@ -185,7 +185,7 @@ class CommentHandler(object):
         # not_found = list(set(bolded) - set([game.name for game in games]))
 
         if comment.subreddit.display_name.lower() == u'boardgamescirclejerk':
-            not_found = old_bolded
+            not_found = None
 
         if not_found:
             log.debug(u'not found: {}'.format(u', '.join(not_found)))
@@ -261,9 +261,9 @@ class CommentHandler(object):
         for game in games:
             players = self._getPlayers(game)
             info = (u'[**{}**](http://boardgamegeek.com/boardgame/{}) '
-                    u' ({}) by {}. [img](http:{}); {}; {} minutes\n\n'.format(
+                    u' ({}) by {}. {}; {} minutes; [img](http:{}) \n\n'.format(
                         game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
-                        game.image, players, game.playing_time))
+                        players, game.playing_time, game.image))
             data = u', '.join(getattr(game, u'mechanics', u''))
             if data:
                 info += u' * Mechanics: {}\n'.format(data)
@@ -283,9 +283,9 @@ class CommentHandler(object):
         for game in games:
             players = self._getPlayers(game)
             info = (u'Details for [**{}**](http://boardgamegeek.com/boardgame/{}) '
-                    u' ({}) by {}. [img](http:{}); {}; {} minutes\n\n'.format(
+                    u' ({}) by {}. {}; {} minutes; [img](http:{})\n\n'.format(
                         game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
-                        game.image, players, game.playing_time))
+                        players, game.playing_time, game.image))
             data = u', '.join(getattr(game, u'mechanics', u''))
             if data:
                 info += u' * Mechanics: {}\n'.format(data)
