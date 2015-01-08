@@ -19,11 +19,8 @@ class CommentHandler(object):
     def __init__(self, UID, botdb):
         self._botdb = botdb
         self._botname = UID
-        self._header = u'*^({} issues a series of sophisticated bleeps and whistles...)*\n\n'.format(self._botname)
-        self._footer = (u'\n\n'
-                        u'-------------\n'
-                        u'^({} is a bot. Looks a little like a trash can, but you shouldn\'t hold that against him.) '
-                        u'[^Submit ^questions, ^abuse, ^and ^bug ^reports ^here.](/r/r2d8)'.format(self._botname))
+        self._header = (u'^*[{}](/r/r2d8)* ^*issues* ^*a* ^*series* ^*of* ^*sophisticated* '
+                        u'^*bleeps* ^*and* ^*whistles...*\n\n'.format(self._botname))
 
         dbpath = pjoin(getcwd(), u'{}-bgg.db'.format(self._botname))
         self._bgg = BGG(cache=u'sqlite://{}?ttl=86400'.format(dbpath))
@@ -218,18 +215,11 @@ class CommentHandler(object):
             not_found = [u'[{}](http://boardgamegeek.com/geeksearch.php?action=search'
                          '&objecttype=boardgame&q={}&B1=Go)'.format(
                              n, quote(n)) for n in not_found]
-            if mode == u'short':
-                infos.append(u'\n\n-----\nBolded items not found at BGG (click to '
-                             u'search): {}\n\n'.format(u', '.join(not_found)))
-            else:
-                infos.append(u'Bolded items not found at BGG (click to search): {}\n\n'.format(u', '.join(not_found)))
+            infos.append(u'\n\nBolded items not found at BGG (click to search): {}\n\n'.format(u', '.join(not_found)))
 
         response = None
         if len(infos):
-            if mode == u'short':
-                response = self._header + u'\n'.join([i for i in infos]) + self._footer
-            else:
-                response = self._header + u'-----\n'.join([i for i in infos]) + self._footer
+            response = self._header + u'\n'.join([i for i in infos])
 
         return response
 
@@ -270,16 +260,16 @@ class CommentHandler(object):
         infos = list()
         for game in games:
             players = self._getPlayers(game)
-            info = (u'Details for [**{}**](http://boardgamegeek.com/boardgame/{}) '
-                    u' ({}) by {}. {}; {} minutes\n\n'.format(
+            info = (u'[**{}**](http://boardgamegeek.com/boardgame/{}) '
+                    u' ({}) by {}. [img](http:{}); {}; {} minutes\n\n'.format(
                         game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
-                        players, game.playing_time))
+                        game.image, players, game.playing_time))
             data = u', '.join(getattr(game, u'mechanics', u''))
             if data:
                 info += u' * Mechanics: {}\n'.format(data)
             people = u'people' if game.users_rated > 1 else u'person'
-            info += u' * Average rating is {}; rated by {} {}\n'.format(
-                game.rating_average, game.users_rated, people)
+            info += u' * Average rating is {}; rated by {} {}. Weight: {}\n'.format(
+                game.rating_average, game.users_rated, people, game.rating_average_weight)
             data = u', '.join([u'{}: {}'.format(r[u'friendlyname'], r[u'value']) for r in game.ranks])
             info += u' * {}\n\n'.format(data)
 
@@ -293,19 +283,24 @@ class CommentHandler(object):
         for game in games:
             players = self._getPlayers(game)
             info = (u'Details for [**{}**](http://boardgamegeek.com/boardgame/{}) '
-                    u' ({}) by {}. {}; {} minutes\n\n'.format(
+                    u' ({}) by {}. [img](http:{}); {}; {} minutes\n\n'.format(
                         game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
-                        players, game.playing_time))
+                        game.image, players, game.playing_time))
             data = u', '.join(getattr(game, u'mechanics', u''))
             if data:
                 info += u' * Mechanics: {}\n'.format(data)
             people = u'people' if game.users_rated > 1 else u'person'
             info += u' * Average rating is {}; rated by {} {}\n'.format(
                 game.rating_average, game.users_rated, people)
+            info += u' * Average Weight: {}; Number of Weights {}\n'.format(
+                game.rating_average_weight, game.rating_num_weights)
             data = u', '.join([u'{}: {}'.format(r[u'friendlyname'], r[u'value']) for r in game.ranks])
             info += u' * {}\n\n'.format(data)
 
             info += u'Description:\n\n{}\n\n'.format(game.description)
+
+            if len(games) > 1:
+                info += u'------'
 
             log.debug(u'adding info: {}'.format(info))
             infos.append(info)
