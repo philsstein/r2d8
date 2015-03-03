@@ -224,6 +224,9 @@ class CommentHandler(object):
         return response
 
     def _getPlayers(self, game):
+        if not game.min_players:
+            return None
+
         if game.min_players == game.max_players:
             players = '{} p'.format(game.min_players)
         else:
@@ -249,10 +252,15 @@ class CommentHandler(object):
         for game in games:
             players = self._getPlayers(game)
             info = (u' * [**{}**](http://boardgamegeek.com/boardgame/{}) '
-                    u' ({}) by {}. {}; {} mins'.format(
-                        game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
-                        players, game.playing_time))
+                    u' ({}) by {}. '.format(
+                        game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown'))))
+            if players:
+                info += '{}; '.format(players)
+            if game.playing_time and int(game.playing_time) != 0:
+                info += '{} mins '.format(game.playing_time)
+
             infos.append(info)
+
 
         return infos
 
@@ -261,9 +269,18 @@ class CommentHandler(object):
         for game in games:
             players = self._getPlayers(game)
             info = (u'[**{}**](http://boardgamegeek.com/boardgame/{}) '
-                    u' ({}) by {}. {}; {} minutes; [img](http:{}) \n\n'.format(
+                    u' ({}) by {}. {}; '.format(
                         game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
-                        players, game.playing_time, game.image))
+                        players))
+
+            if game.playing_time and int(game.playing_time) != 0:
+                info += '{} minutes; '.format(game.playing_time)
+
+            if game.image:
+                info += '[img](http:{}) '.format(game.image)
+
+            info += '\n\n'
+
             data = u', '.join(getattr(game, u'mechanics', u''))
             if data:
                 info += u' * Mechanics: {}\n'.format(data)
@@ -283,9 +300,16 @@ class CommentHandler(object):
         for game in games:
             players = self._getPlayers(game)
             info = (u'Details for [**{}**](http://boardgamegeek.com/boardgame/{}) '
-                    u' ({}) by {}. {}; {} minutes; [img](http:{})\n\n'.format(
-                        game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown')),
-                        players, game.playing_time, game.image))
+                    u' ({}) by {}. '.format(
+                        game.name, game.id, game.year, u', '.join(getattr(game, u'designers', u'Unknown'))))
+            if players:
+                info += '{}; '.format(players)
+            if game.playing_time and int(game.playing_time) != 0:
+                info += '{} minutes; '.format(game.playing_time)
+            if game.image:
+                info += '[img](http:{}) '.format(game.image)
+            info += '\n\n'
+
             data = u', '.join(getattr(game, u'mechanics', u''))
             if data:
                 info += u' * Mechanics: {}\n'.format(data)
