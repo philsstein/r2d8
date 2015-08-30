@@ -40,7 +40,14 @@ class BotDatabase(object):
             self._connection.execute(u'CREATE table bot_admins (ruid text)')
             for a in ['phil_s_stein', u'timotab']:
                 log.info(u'Adding {} as admin'.format(a))
-                self._connection.execute(u'INSERT INTO bot_admins VALUES (?)', (a,)) 
+                self._connection.execute(u'INSERT INTO bot_admins VALUES (?)', (a,))
+
+        stmt = u'SELECT name FROM sqlite_master WHERE type="table" AND name="ignore"'
+        q = self._connection.execute(stmt).fetchall()
+        if not q:
+            self._connection.execute(u'CREATE table ignore (uid text)')
+            log.info('Created ignore table.')
+            pass
 
         self._connection.commit()
 
@@ -79,3 +86,10 @@ class BotDatabase(object):
 
         return False if rows[0][0] == 0 else True
 
+    def ignore_user(self, uid):
+        cmd = u'SELECT COUNT(uid) FROM ignore where uid=?'
+        rows = self._connection.execute(cmd, (uid,)).fetchall()
+        if not rows:
+            return False
+
+        return False if rows[0][0] == 0 else True

@@ -6,6 +6,7 @@ import re
 from time import sleep
 from urllib2 import quote, unquote
 from random import choice
+from HTMLParser import HTMLParser
 from os import getcwd
 from os.path import join as pjoin
 from boardgamegeek import BoardGameGeek as BGG
@@ -28,6 +29,9 @@ class CommentHandler(object):
     def _bggQueryGame(self, name):
         '''Try "name", then if not found try a few other small things in an effort to find it.'''
         name = name.lower().strip()   # GTL extra space at ends shouldn't be matching anyway, fix this.
+        if not name: 
+            return None
+
         if len(name) > 128:
             log.warn('Got too long game name: {}'.format(name))
             return None
@@ -90,19 +94,22 @@ class CommentHandler(object):
     def _bggSearchGame(self, name):
         '''Use the much wider search API to find the game.'''
         items = self._bgg.search(name, search_type=BoardGameGeekNetworkAPI.SEARCH_BOARD_GAME, exact=True)
-        if len(items) == 1:
+        if items and len(items) == 1:
             log.debug('Found exact match using search().')
             return self._bgg.game(items[0].name)
 
         # exact match not found, trying sloppy match
         items = self._bgg.search(name, search_type=BoardGameGeekNetworkAPI.SEARCH_BOARD_GAME)
-        if not len(items):
+        if items and not len(items):
             log.debug('Found no matches at all using search().')
             return None
 
-        if len(items) == 1:
-            log.debug('Found onw matce using search().')
+        if items and len(items) == 1:
+            log.debug('Found one match usinh search().')
             return self._bgg.game(items[0].name)
+        
+        if not items:
+            return None
 
         # assume most owned is what people want. Is this good? Dunno.
         most_owned = None
@@ -237,6 +244,10 @@ class CommentHandler(object):
     def getInfo(self, comment, replyTo=None, mode=None):
         '''Reply to comment with game information. If replyTo isot given reply to original else
         reply to given comment.'''
+        if self._botdb.ignore_user(comment.author.name):
+            log.info("Ignoring comment by {}".format(comment.author.name))
+            return
+
         response = self._getInfoResponseBody(comment, mode)
         if response:
             if replyTo:
@@ -334,6 +345,9 @@ class CommentHandler(object):
     def repairComment(self, comment):
         '''Look for maps from missed game names to actual game names. If
         found repair orginal comment.'''
+        if self._botdb.ignore_user(comment.author.name):
+            log.info("Ignoring comment by {}".format(comment.author.name))
+            return
         #
         # The repair is done by replacing the new games names with the old (wrong)
         # games names in the original /u/r2d8 response, then recreating the entire
@@ -400,6 +414,10 @@ class CommentHandler(object):
 
     def getParentInfo(self, comment):
         '''Allows others to call the bot to getInfo for parent posts.'''
+        if self._botdb.ignore_user(comment.author.name):
+            log.info("Ignoring comment by {}".format(comment.author.name))
+            return
+
         log.debug(u'Got getParentInfo comment in id {}'.format(comment.id))
 
         if comment.is_root:
@@ -432,6 +450,10 @@ class CommentHandler(object):
         comment.reply(response)
 
     def getaliases(self, comment):
+        if self._botdb.ignore_user(comment.author.name):
+            log.info("Ignoring comment by {}".format(comment.author.name))
+            return
+
         aliases = self._botdb.aliases()
         response = u'Current aliases:\n\n'
         for name, alias in sorted(aliases, key=lambda g: g[1]):
