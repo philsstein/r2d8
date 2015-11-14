@@ -1,10 +1,3 @@
-In order to run the bot, you need a file called BotConfig.py which looks like the following:
-
-cat > BotConfig.py
-UID=[reddit account login id]
-PASSWD=[password if UID's account]
-^D
-
 When run the bot creates two sqlite databases, one for BGG URL queries and one for keeping track of comments and responses. The default names are:
 
     UID-bot.db - the comment database
@@ -19,3 +12,4 @@ Requirements:
  - boardgamegeek
  - sqlite3 (included in most distributions, I think.)
 
+For authorization an file in the current directory must exist, must be named "r2d8_auth.py" and must export a method named login() that logs into Reddit and returns a PRAW Reddit instance. See https://www.reddit.com/r/GoldTesting/comments/3cm1p8/how_to_make_your_bot_use_oauth2/ for details. 
