@@ -6,7 +6,6 @@ import re
 from time import sleep
 from urllib2 import quote, unquote
 from random import choice
-from HTMLParser import HTMLParser
 from os import getcwd
 from os.path import join as pjoin
 from boardgamegeek import BoardGameGeek as BGG
@@ -29,7 +28,7 @@ class CommentHandler(object):
     def _bggQueryGame(self, name):
         '''Try "name", then if not found try a few other small things in an effort to find it.'''
         name = name.lower().strip()   # GTL extra space at ends shouldn't be matching anyway, fix this.
-        if not name: 
+        if not name:
             return None
 
         if len(name) > 128:
@@ -107,7 +106,7 @@ class CommentHandler(object):
         if items and len(items) == 1:
             log.debug('Found one match usinh search().')
             return self._bgg.game(items[0].name)
-        
+
         if not items:
             return None
 
@@ -159,11 +158,10 @@ class CommentHandler(object):
         if comment.subreddit.display_name.lower() == u'boardgamescirclejerk':
             cjgames = [
                 [u'Dead of Winter: A Crossroads Game'],
-                [u'Ginkgopolis'],
-                [u'Machi Koro'],
                 [u'Scythe']
             ]
             bolded = choice(cjgames)
+            bolded = ['Scythe', 'Scythe', 'Scythe']
 
         seen = set()
         for game_name in bolded:
@@ -180,8 +178,8 @@ class CommentHandler(object):
                 else:
                     not_found.append(game_name)
 
-            except boardgamegeek.exceptions.BoardGameGeekError:
-                log.error(u'Error getting info from BGG on {}'.format(game_name))
+            except boardgamegeek.exceptions.BoardGameGeekError as e:
+                log.error(u'Error getting info from BGG on {}: {}'.format(game_name, e))
                 continue
 
         # sort by game name because why not?
@@ -272,7 +270,6 @@ class CommentHandler(object):
 
             infos.append(info)
 
-
         return infos
 
     def _getStdInfos(self, games):
@@ -288,7 +285,7 @@ class CommentHandler(object):
                 info += '{} minutes; '.format(game.playing_time)
 
             if game.image:
-                info += '[img](http:{}) '.format(game.image)
+                info += '[img]({}) '.format(game.image)
 
             info += '\n\n'
 
@@ -318,7 +315,7 @@ class CommentHandler(object):
             if game.playing_time and int(game.playing_time) != 0:
                 info += '{} minutes; '.format(game.playing_time)
             if game.image:
-                info += '[img](http:{}) '.format(game.image)
+                info += '[img]({}) '.format(game.image)
             info += '\n\n'
 
             data = u', '.join(getattr(game, u'mechanics', u''))

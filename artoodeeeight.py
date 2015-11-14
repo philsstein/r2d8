@@ -1,47 +1,42 @@
 import argparse
 import praw
-import requests
 import logging
 import re
 from HTMLParser import HTMLParser
 from time import sleep
 
 from argParseLog import addLoggingArgs, handleLoggingArgs
-from BotConfig import UID, PASSWD
 from BotDatabase import BotDatabase
 from CommentHandler import CommentHandler
+
+from r2d8_auth import login as oauth_login
 
 log = logging.getLogger(__name__)
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument(u'-d', u'--database', help=u'The bot database. Default is {}-bot.db'.format(UID),
-                    default=u'{}-bot.db'.format(UID))
-    ap.add_argument(u'-u', u'--uid', help=u'The Reddit user ID to run the bot as. '
-                    u'Default is {}'.format(UID))
+    botname = 'r2d8'
+    dbname = '{}-bot.db'.format(botname)
+    ap.add_argument(u'-d', u'--database', help=u'The bot database. Default is {}'.format(dbname),
+                    default=u'{}'.format(dbname))
     addLoggingArgs(ap)
     args = ap.parse_args()
     handleLoggingArgs(args)
 
-    UID = args.uid if args.uid else UID
+    dbname = args.database if args.database else dbname
 
     hp = HTMLParser()
 
     # quiet requests
     logging.getLogger(u"requests").setLevel(logging.WARNING)
 
-    log.info(u'connecting to reddit with uid {}'.format(UID))
-    reddit = praw.Reddit(u'{} bot for linking to boardgame information, v 0.1. '
-                         u'/u/phil_s_stein see /r/{}'.format(UID, UID))
-    log.info(u'Connected. Logging in as {}'.format(UID))
-    reddit.login(username=UID, password=PASSWD)
-    log.info(u'Logged in.')
-    
+    reddit = oauth_login()
+
     bdb = BotDatabase(args.database)
     log.info(u'Bot database opened/created.')
-    ch = CommentHandler(UID, bdb)
+    ch = CommentHandler(botname, bdb)
     log.info(u'Comment/notification handler created.')
-    botcmds = re.compile(u'/u/{}\s(\w+)'.format(UID, UID), re.IGNORECASE)
+    botcmds = re.compile(u'/?u/{}\s(\w+)'.format(botname), re.IGNORECASE)
     cmdmap = {
         u'getinfo': ch.getInfo,
         u'repair': ch.repairComment,

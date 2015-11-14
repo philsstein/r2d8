@@ -1,4 +1,4 @@
 *.un~
 *.pyc
 *.db
-BotConfig.py
+r2d8_auth.py
